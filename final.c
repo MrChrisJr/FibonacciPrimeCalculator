@@ -2,62 +2,79 @@
 #include <stdlib.h>
 #include <pthread.h>
 
-#define NUM_THREADS 4
-#define N 20  // The position up to which Fibonacci numbers will be calculated
-
-// Struct to hold the data for each thread
+// Structure to hold data for each thread
 typedef struct {
-    int start;
-    int end;
-    long long *fib_array;
+    int n;
+    long long result;
 } ThreadData;
 
 void *calculate_fibonacci(void *arg) {
     ThreadData *data = (ThreadData *)arg;
-    int start = data->start;
-    int end = data->end;
-    long long *fib_array = data->fib_array;
+    int n = data->n;
 
-    for (int i = start; i <= end; i++) {
-        if (i == 0) {
-            fib_array[i] = 0;
-        } else if (i == 1) {
-            fib_array[i] = 1;
-        } else {
-            fib_array[i] = fib_array[i - 1] + fib_array[i - 2];
+    if (n == 0) {
+        data->result = 0;
+    } else if (n == 1) {
+        data->result = 1;
+    } else {
+        long long a = 0, b = 1;
+        for (int i = 2; i <= n; i++) {
+            long long temp = a + b;
+            a = b;
+            b = temp;
         }
+        data->result = b;
     }
     pthread_exit(NULL);
 }
 
+int is_prime(int num) {
+    if (num <= 1) return 0;
+    if (num <= 3) return 1;
+    if (num % 2 == 0 || num % 3 == 0) return 0;
+    for (int i = 5; i * i <= num; i += 6) {
+        if (num % i == 0 || num % (i + 2) == 0) return 0;
+    }
+    return 1;
+}
+
+void *calculate_prime(void *arg) {
+    ThreadData *data = (ThreadData *)arg;
+    int n = data->n;
+    int count = 0, num = 2;
+
+    while (count < n) {
+        if (is_prime(num)) {
+            count++;
+        }
+        if (count < n) num++;
+    }
+    data->result = num;
+    pthread_exit(NULL);
+}
+
 int main() {
-    pthread_t threads[NUM_THREADS];
-    ThreadData thread_data[NUM_THREADS];
-    long long *fib_array = malloc(N * sizeof(long long));
+    pthread_t thread1, thread2;
+    ThreadData fib_data, prime_data;
 
-    if (fib_array == NULL) {
-        perror("Failed to allocate memory");
-        return EXIT_FAILURE;
-    }
+    int n;
+    printf("Enter the value of n: ");
+    scanf("%d", &n);
 
-    int segment_size = N / NUM_THREADS;
-    for (int i = 0; i < NUM_THREADS; i++) {
-        thread_data[i].start = i * segment_size;
-        thread_data[i].end = (i == NUM_THREADS - 1) ? N - 1 : (i + 1) * segment_size - 1;
-        thread_data[i].fib_array = fib_array;
-        pthread_create(&threads[i], NULL, calculate_fibonacci, &thread_data[i]);
-    }
+    fib_data.n = n;
+    prime_data.n = n;
 
-    for (int i = 0; i < NUM_THREADS; i++) {
-        pthread_join(threads[i], NULL);
-    }
+    // Create threads to calculate Fibonacci and prime numbers
+    pthread_create(&thread1, NULL, calculate_fibonacci, &fib_data);
+    pthread_create(&thread2, NULL, calculate_prime, &prime_data);
 
-    printf("Fibonacci sequence up to position %d:\n", N);
-    for (int i = 0; i < N; i++) {
-        printf("%lld ", fib_array[i]);
-    }
-    printf("\n");
+    // Wait for both threads to finish
+    pthread_join(thread1, NULL);
+    pthread_join(thread2, NULL);
 
-    free(fib_array);
+    // Print results
+    printf("The %dth Fibonacci number is: %lld\n", n, fib_data.result);
+    printf("The %dth prime number is: %lld\n", n, prime_data.result);
+
     return 0;
 }
